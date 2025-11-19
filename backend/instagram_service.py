@@ -1,3 +1,33 @@
+from typing import Optional
+import requests
+from sqlalchemy.orm import Session
+from models import Chatbot, Keyword, Message
+
+
+class InstagramService:
+    def __init__(self, access_token: str):
+        self.access_token = access_token
+        self.base_url = "https://graph.instagram.com/v18.0"
+    
+    def send_message(self, recipient_id: str, message_text: str) -> dict:
+        """Slanje poruke preko Instagram API"""
+        url = f"{self.base_url}/me/messages"
+        
+        payload = {
+            "recipient": {"id": recipient_id},
+            "message": {"text": message_text}
+        }
+        
+        params = {"access_token": self.access_token}
+        
+        try:
+            response = requests.post(url, json=payload, params=params)
+            return response.json()
+        except Exception as e:
+            print(f"❌ Error sending message: {e}")
+            return {"error": str(e)}
+
+
 def process_incoming_message(
     sender_id: str,
     message_text: str,
@@ -63,15 +93,6 @@ def process_incoming_message(
 def verify_webhook(mode: str, token: str, challenge: str, verify_token: str) -> Optional[str]:
     """
     Verifikacija Instagram webhook-a
-    
-    Args:
-        mode: Subscription mode
-        token: Verify token
-        challenge: Challenge string
-        verify_token: Expected verify token
-        
-    Returns:
-        Challenge string if valid, None otherwise
     """
     if mode == "subscribe" and token == verify_token:
         return challenge
