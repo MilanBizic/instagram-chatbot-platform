@@ -310,33 +310,15 @@ def delete_keyword(
 
 # ==================== INSTAGRAM WEBHOOK ====================
 
-@app.get("/api/webhook")
-def verify_webhook_endpoint(
-    request: Request,
-    hub_mode: str = None,
-    hub_verify_token: str = None,
-    hub_challenge: str = None
-):
-    """Instagram webhook verification"""
-    mode = hub_mode or request.query_params.get("hub.mode")
-    token = hub_verify_token or request.query_params.get("hub.verify_token")
-    challenge = hub_challenge or request.query_params.get("hub.challenge")
-    
-    result = verify_webhook(mode, token, challenge, WEBHOOK_VERIFY_TOKEN)
-    
-    if result:
-        return int(result)
-    else:
-        raise HTTPException(status_code=403, detail="Verification failed")
-
-
 @app.post("/api/webhook")
 async def webhook_handler(request: Request, db: Session = Depends(get_db)):
     """Primanje Instagram poruka"""
     try:
         body = await request.json()
+        print(f"📨 WEBHOOK DATA: {body}")
         
         if body.get("object") != "instagram":
+            print("❌ Not Instagram object, ignoring")
             return {"status": "ignored"}
         
         for entry in body.get("entry", []):
@@ -344,24 +326,27 @@ async def webhook_handler(request: Request, db: Session = Depends(get_db)):
                 sender_id = messaging_event["sender"]["id"]
                 recipient_id = messaging_event["recipient"]["id"]
                 
-                # Provera da li postoji poruka
+                print(f"📩 Message from {sender_id} to {recipient_id}")
+                
                 if "message" in messaging_event:
                     message_text = messaging_event["message"].get("text", "")
+                    print(f"💬 Message text: {message_text}")
                     
-                    # Pronalaženje chatbota za ovaj Instagram account
                     chatbot = db.query(Chatbot).filter(
                         Chatbot.instagram_account_id == recipient_id,
                         Chatbot.is_active == True
                     ).first()
                     
                     if chatbot:
-                        # Procesiranje poruke i slanje odgovora
+                        print(f"✅ Found chatbot: {chatbot.name}")
                         process_incoming_message(sender_id, message_text, chatbot, db)
+                    else:
+                        print(f"❌ No chatbot found for recipient_id: {recipient_id}")
         
         return {"status": "ok"}
     
     except Exception as e:
-        print(f"Webhook error: {e}")
+        print(f"❌ Webhook error: {e}")
         return {"status": "error", "message": str(e)}
 
 
